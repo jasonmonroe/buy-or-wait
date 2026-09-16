@@ -1,0 +1,10 @@
+# .gitignore
+
+.DS_Store
+.env
+.idea
+.venv
+.vscode
+venv
+
+dataset/_output_orig.csv
