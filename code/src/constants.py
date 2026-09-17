@@ -1,4 +1,7 @@
 # src/constants.py
+# +---------------------------------------------------------------------------+
+# |                               CONSTANTS                                   |
+# +---------------------------------------------------------------------------+
 
 import os
 
@@ -7,14 +10,35 @@ MODEL_NAME = os.environ("MODEL_NAME")
 MODEL_API_KEY = os.environ("MODEL_API_KEY")
 MODEL_API_URL = os.environ("MODEL_API_URL")
 
-DATASET_DIR = "dataset"
+ARGS_LIST = [
+    "--eda",
+    "--eval",
+    "--sample",
+    "--id:",  # request id
+]
+
+SECS_IN_MIN = 60
+MSEC = 1000
+
+DATASET_DIR = "dataset/"
 
 
 # Fields
 
-
 NONE_VAL = "none"
 
+DATASET_FILES = [
+    "exchange_rates",
+    "financial_events",
+    "financial_profiles",
+    # "images",
+    "messages",
+    "output",
+    "request_payment_options",
+    "requests",
+]
+
+IMAGE_DIR = f"{DATASET_DIR}/media/"
 
 INPUT_COLS = [
     "request_id",
@@ -36,31 +60,4 @@ OUTPUT_COLS = [
     "earliest_date_for_full_payment",
     "spending_changes_needed",
     "decision_explanation",
-]
-
-AFFORDABILITY_STATUSES = [
-    "affordable_now",
-    "affordable_with_plan",
-    "affordable_later",
-    "not_affordable",
-]
-
-RECOMMENDED_PAYMENT_METHODS = [
-    "full_payment",
-    "partial_payment",
-    "installments",
-    "wait",
-    "not_recommended",
-]
-
-REQUEST_TYPES = [
-    "purchase",
-    "travel",
-    "education",
-    "family_transfer",
-    "debt_repayment",
-    "investment",
-    "housing",
-    "emergency_expense",
-    "other",
 ]

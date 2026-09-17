@@ -1,3 +1,10 @@
 # requirements.txt
 
 pandas
+pathlib
+pytest
+pytest-mock
+python-dotenv
+python-frontmatter
+typing
+xmltodict
