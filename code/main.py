@@ -35,16 +35,19 @@ __version__ = "1.0.0"
 import inspect
 import sys
 import warnings
-from code.evaluation.main import run_evaluation_pipeline
-from code.pipelines.process_request import run_process_request_pipeline
-from code.src.constants import APP_NAME, ARGS_LIST
-from code.src.data_handler import DataHandler
-from code.src.utils import gen_run_id, show_timer, start_timer
+
+from evaluation.main import run_evaluation_pipeline
+from pipelines.process_request import run_process_request_pipeline
+from src.constants import APP_NAME, ARGS_LIST
+from src.data_handler import DataHandler
+from src.utils import gen_run_id, show_timer, start_timer
 
 
 def run_main_pipeline(args: dict):
-    m = inspect.f_code.co_name.title().replace("_", " ").upper()
+    m = inspect.currentframe().f_code.co_name.title().replace("_", " ").upper()
     print(f"🏃 {m}")
+
+    print(args)
 
     # Data Handling
     data_handle = DataHandler(args)
@@ -53,14 +56,36 @@ def run_main_pipeline(args: dict):
     output = run_process_request_pipeline(args, data_handle.__dict__)
 
     # Save Outputs
+    # data_handle.save(output)
 
     # Evaluate
     if args.get("eval"):
         run_evaluation_pipeline()
 
 
-def _parse_args(command_line_str: str) -> dict:
-    return {arg.strip("--"): (arg in command_line_str) for arg in ARGS_LIST}
+def _parse_args(argv: list[str]) -> dict:
+    """
+    Parses CLI args against ARGS_LIST.
+
+    A flag ending in ":" (e.g. "--id:") takes a value, passed as
+    "--id:<value>" (no space). When present, its key is the whole
+    "id:<value>" token and its value is True; when absent, the key falls
+    back to the bare "id" and its value is False. Every other flag is a
+    plain boolean, True if present in argv.
+    """
+    parsed = {}
+    for arg in ARGS_LIST:
+        if arg.endswith(":"):
+            match = next((token for token in argv if token.startswith(arg)), None)
+            if match is not None:
+                parsed[match.strip("-")] = True
+            else:
+                parsed[arg.strip("-").rstrip(":")] = False
+        else:
+            key = arg.strip("-")
+            parsed[key] = arg in argv
+
+    return parsed
 
 
 if __name__ == "__main__":

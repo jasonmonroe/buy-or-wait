@@ -5,10 +5,10 @@
 
 import os
 
-APP_NAME = os.environ("APP_NAME", None)
-MODEL_NAME = os.environ("MODEL_NAME")
-MODEL_API_KEY = os.environ("MODEL_API_KEY")
-MODEL_API_URL = os.environ("MODEL_API_URL")
+APP_NAME = os.environ.get("APP_NAME", None)
+MODEL_NAME = os.environ.get("MODEL_NAME")
+MODEL_API_KEY = os.environ.get("MODEL_API_KEY")
+MODEL_API_URL = os.environ.get("MODEL_API_URL")
 
 ARGS_LIST = [
     "--eda",
@@ -17,13 +17,10 @@ ARGS_LIST = [
     "--id:",  # request id
 ]
 
-SECS_IN_MIN = 60
 MSEC = 1000
+SECS_IN_MIN = 60
 
 DATASET_DIR = "dataset/"
-
-
-# Fields
 
 NONE_VAL = "none"
 

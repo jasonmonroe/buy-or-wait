@@ -6,12 +6,12 @@
 # Python Libraries
 
 # Local Libraries
-from code.src.constants import DATASET_DIR, DATASET_FILES
-from code.src.utils import pretty_dict
 from pathlib import Path
 
 # Vendor Libraries
 import pandas as pd
+from src.constants import DATASET_DIR, DATASET_FILES, IMAGE_DIR
+from src.utils import pretty_dict
 
 
 class DataHandler:
@@ -37,17 +37,26 @@ class DataHandler:
 
         # Override request with sample request
         if use_sample:
+            print("\nOverriding requests...")
             self.requests = self._path("sample_requests")
 
     def _path(self, csv_file: str) -> pd.DataFrame:
-        filepath = f"{DATASET_DIR}/{csv_file}.csv"
-        print(f"\n 📁 Loading {filepath}")
+        filepath = f"{DATASET_DIR}{csv_file}.csv"
+        print(f"📁 Loading {filepath}")
         return pd.read_csv(Path(filepath))
 
     def _load_images(self):
-        image_path = Path(f"{DATASET_DIR}")
+        image_path = Path(f"{IMAGE_DIR}")
         if image_path.exists():
             pass
+
+    def save(self, output_rows: dict):
+        df = pd.DataFrame(output_rows) if isinstance(output_rows, list) else output_rows
+
+        # Now call .to_csv() on the DataFrame
+        output_file = Path(f"{DATASET_DIR}/output.csv")
+        print(f"Saving Data to {output_file}")
+        df.to_csv(output_file, index=False)
 
     def _describe(self):
         print("\n# --- 📚 Data Description 📚 --- #".upper())
@@ -57,23 +66,23 @@ class DataHandler:
 
             csv_df = getattr(self, csv_file)
 
-            print(f"Number of rows: {len(csv_df)}")
-            print(f"\n 🗂️ Number of columns: {len(csv_df.columns)}")
-            print(f"\n 🗂️ Columns:\n{pretty_dict(csv_df.columns.tolist())}")
-            print(f"\n 🗂️ Data types:\n{pretty_dict(csv_df.dtypes.to_dict())}")
+            print(f"🗂️ Row Count: {len(csv_df)}")
+            print(f"\n🗂️ Column Count: {len(csv_df.columns)}")
+            print(f"\n🗂️ Columns:\n{pretty_dict(csv_df.columns.tolist())}")
+            print(f"\n🗂️ Data Types:\n{pretty_dict(csv_df.dtypes.to_dict())}")
             print(
-                f"\n 🗂️ Missing values:\n{pretty_dict(csv_df.isnull().sum().to_dict())}"
+                f"\n🗂️ Missing Values:\n{pretty_dict(csv_df.isnull().sum().to_dict())}"
             )
-            print(f"\n 🗂️ Unique values:\n{pretty_dict(csv_df.nunique().to_dict())}")
+            print(f"\n🗂️ Unique Values:\n{pretty_dict(csv_df.nunique().to_dict())}")
 
             # Convert Tuples from value_counts() into string keys for JSON serialization
             val_counts_dict = {
                 str(k): v for k, v in csv_df.value_counts().to_dict().items()
             }
-            print(f"\n 🗂️ Value counts:\n{pretty_dict(val_counts_dict)}")
+            print(f"\n🗂️ Value Counts:\n{pretty_dict(val_counts_dict)}")
 
             print(
-                f"\n 🗂️ Descriptive statistics:\n{pretty_dict(csv_df.describe(include='all').to_dict())}"
+                f"\n🗂️ Descriptive statistics:\n{pretty_dict(csv_df.describe(include='all').to_dict())}"
             )
 
             print("\n# --- Data Head --- #")
