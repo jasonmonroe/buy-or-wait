@@ -1,10 +1,11 @@
 # requirements.txt
-
+easyocr
+litellm
 pandas
-pathlib
+pytesseract
+pillow
 pytest
 pytest-mock
 python-dotenv
 python-frontmatter
-typing
 xmltodict

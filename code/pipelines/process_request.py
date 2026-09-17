@@ -27,8 +27,6 @@ def run_process_request_pipeline(args: dict, dataset: dict) -> dict:
     if request_idx is not None:
         if request_idx >= 0 and request_idx < len(requests_df):
             print(f"request_idx={request_idx}")
-            # row = requests_df.iloc[request_idx]
-            # request_data = agent.join_data(dataset)
             output = agent.process_by_id(requests_df.iloc[request_idx])
             output_rows.append(output)
     else:

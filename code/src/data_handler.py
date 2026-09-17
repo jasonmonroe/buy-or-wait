@@ -10,7 +10,7 @@ from pathlib import Path
 
 # Vendor Libraries
 import pandas as pd
-from src.constants import DATASET_DIR, DATASET_FILES
+from src.constants import CSV_FILENAMES, DATASET_DIR, OUTPUT_FILE
 from src.utils import pretty_dict
 
 
@@ -33,7 +33,7 @@ class DataHandler:
 
     def _load_data(self, use_sample: bool):
 
-        for csv_file in DATASET_FILES:
+        for csv_file in CSV_FILENAMES:
             setattr(self, csv_file, self._path(csv_file))
 
         # Override request with sample request
@@ -53,14 +53,15 @@ class DataHandler:
         df = pd.DataFrame(output_rows) if isinstance(output_rows, list) else output_rows
 
         # Now call .to_csv() on the DataFrame
-        output_file = Path(f"{DATASET_DIR}/output.csv")
+        output_file = Path(OUTPUT_FILE)
         print(f"Saving Data to {output_file}")
+
         df.to_csv(output_file, index=False)
 
     def _describe(self):
         print("\n# --- 📚 Data Description 📚 --- #".upper())
 
-        for csv_file in DATASET_FILES:
+        for csv_file in CSV_FILENAMES:
             print(f"Csv File: {csv_file}".upper())
 
             csv_df = getattr(self, csv_file)
