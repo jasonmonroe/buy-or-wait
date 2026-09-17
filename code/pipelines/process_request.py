@@ -4,6 +4,7 @@
 # +---------------------------------------------------------------------------+
 
 import inspect
+import sys
 
 from agents.request_agent import RequestAgent
 from models.llm_model import LlmModel
@@ -19,25 +20,27 @@ def run_process_request_pipeline(args: dict, dataset: dict) -> dict:
     requests_df = dataset.get("requests")
 
     llm_model = LlmModel()
-    agent = RequestAgent(llm_model)
+    agent = RequestAgent(llm_model, dataset)
 
     request_idx = _check_id(args)
 
-    if request_idx:
-        request_idx = int(request_idx)
-        if request_idx > 0 and request_idx < len(requests_df):
+    if request_idx is not None:
+        if request_idx >= 0 and request_idx < len(requests_df):
             print(f"request_idx={request_idx}")
-            row = requests_df.iloc[request_idx]
-            output = agent.process_by_id(row)
+            # row = requests_df.iloc[request_idx]
+            # request_data = agent.join_data(dataset)
+            output = agent.process_by_id(requests_df.iloc[request_idx])
             output_rows.append(output)
     else:
-        for csv_request in requests_df:
+        for _, csv_request in requests_df.iterrows():
             output = agent.process_by_id(csv_request)
             output_rows.append(output)
 
+    print(f"output_rows={output_rows}")
+    sys.exit(0)
     return output_rows
 
 
-def _check_id(args: dict) -> str | None:
+def _check_id(args: dict) -> int | None:
     id_key = next((k for k in args if k.startswith("id:")), None)
-    return id_key.split(":", 1)[1] if id_key else None
+    return int(id_key.split(":", 1)[1]) if id_key else None

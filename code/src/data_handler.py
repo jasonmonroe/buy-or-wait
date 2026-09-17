@@ -10,7 +10,7 @@ from pathlib import Path
 
 # Vendor Libraries
 import pandas as pd
-from src.constants import DATASET_DIR, DATASET_FILES, IMAGE_DIR
+from src.constants import DATASET_DIR, DATASET_FILES
 from src.utils import pretty_dict
 
 
@@ -26,6 +26,7 @@ class DataHandler:
         self.requests = None
 
         self._load_data(args.get("sample"))
+        # self._load_images()
 
         if args.get("eda"):
             self._describe()
@@ -45,10 +46,8 @@ class DataHandler:
         print(f"📁 Loading {filepath}")
         return pd.read_csv(Path(filepath))
 
-    def _load_images(self):
-        image_path = Path(f"{IMAGE_DIR}")
-        if image_path.exists():
-            pass
+    def load_image(self):
+        pass
 
     def save(self, output_rows: dict):
         df = pd.DataFrame(output_rows) if isinstance(output_rows, list) else output_rows

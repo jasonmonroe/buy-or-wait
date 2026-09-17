@@ -28,7 +28,7 @@ DATASET_FILES = [
     "exchange_rates",
     "financial_events",
     "financial_profiles",
-    # "images",
+    "images",
     "messages",
     "output",
     "request_payment_options",
