@@ -17,9 +17,7 @@ def gen_run_id() -> str:
 
 
 def start_timer() -> float:
-    """
-    Start a timer
-    """
+    """Start a timer."""
     return time.time()
 
 
@@ -62,8 +60,8 @@ def get_progress_bar(idx: int, total: int) -> str:
 
 
 def pretty_dict(d: dict, indent: int = 4, stage: str = "") -> str:
-    """Converts a dictionary into a pretty-printed, indented JSON string.
-
+    """
+    Converts a dictionary into a pretty-printed, indented JSON string.
     Handles custom types like Enums safely.
     """
     pretty = json.dumps(

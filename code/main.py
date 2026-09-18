@@ -54,7 +54,7 @@ from src.utils import gen_run_id, show_timer, start_timer
 
 def run_main_pipeline(args: dict):
     m = inspect.currentframe().f_code.co_name.title().replace("_", " ").upper()
-    print(f"🏃 {m}")
+    print(f"\n🏃 {m}")
 
     print(args)
 
@@ -100,7 +100,7 @@ def _parse_args(argv: list[str]) -> dict:
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
 
-    print(f"\n-----  🖥️ {APP_NAME} 🖥️  -----")
+    print(f"\n-----  🖥️ {APP_NAME} 🖥️  -----\n")
 
     prog_start_time = start_timer()
     run_id = gen_run_id()

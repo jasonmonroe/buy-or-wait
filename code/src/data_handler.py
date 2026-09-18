@@ -115,8 +115,11 @@ class DataHandler:
 
         for col in LIST_COLUMNS.get(csv_file, []):
             if col in df.columns:
+                # Tuples, not lists: hashable, so nunique()/value_counts() in
+                # _describe() (--eda) don't choke on them, and every downstream
+                # use (membership checks, set(), .isin()) works identically.
                 df[col] = df[col].apply(
-                    lambda v: v.split("|") if isinstance(v, str) and v else []
+                    lambda v: tuple(v.split("|")) if isinstance(v, str) and v else ()
                 )
 
         return df
