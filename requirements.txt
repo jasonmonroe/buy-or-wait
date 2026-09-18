@@ -5,6 +5,7 @@ pandas
 pytesseract
 pillow
 pytest
+pytest-cov
 pytest-mock
 python-dotenv
 python-frontmatter
