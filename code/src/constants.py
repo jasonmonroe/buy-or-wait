@@ -22,11 +22,25 @@ RATE_LIMIT_PAUSE_TIMER = 30
 RATE_LIMIT_RETRIES = 3
 
 MAX_TOKENS = 4096
+MILLION = 1_000_000
 MSEC = 1000
 SECS_IN_MIN = 60
 
 DATASET_DIR = "dataset/"
 OUTPUT_FILE = f"{DATASET_DIR}output.csv"
+
+EVALUATION_DIR = "evaluation/"
+USAGE_REPORT_FILE = f"{EVALUATION_DIR}usage_report.md"
+
+# Per-1M-token pricing (USD) for the evaluation/usage_report.md cost estimate.
+# Keyed by the model name the provider actually reports back on each response
+# (response.model), so a run automatically picks up the right rate even if
+# MODEL_NAME changes. Fill in real rates from your provider's pricing page -
+# a missing/None entry makes the report honestly report cost as unavailable
+# rather than guessing.
+MODEL_PRICING = {
+    "gemini-3.8-flash": {"input_per_million": None, "output_per_million": None},
+}
 
 
 CSV_FILENAMES = [

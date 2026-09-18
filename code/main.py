@@ -62,14 +62,14 @@ def run_main_pipeline(args: dict):
     data_handle = DataHandler(args)
 
     # Process Tickets
-    output = run_process_request_pipeline(args, data_handle.__dict__)
+    output, usage = run_process_request_pipeline(args, data_handle.__dict__)
 
     # Save Outputs
     data_handle.save(output)
 
     # Evaluate
     if args.get("eval"):
-        run_evaluation_pipeline()
+        run_evaluation_pipeline(usage, request_count=len(output))
 
 
 def _parse_args(argv: list[str]) -> dict:

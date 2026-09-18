@@ -10,10 +10,13 @@ import inspect
 # Local Libraries
 from agents.request_agent import RequestAgent
 from models.llm_model import LlmModel
+from src.usage_tracker import UsageTracker
 from src.utils import get_progress_bar, show_timer, start_timer
 
 
-def run_process_request_pipeline(args: dict, dataset: dict) -> dict:
+def run_process_request_pipeline(
+    args: dict, dataset: dict
+) -> tuple[list, UsageTracker]:
     m = inspect.currentframe().f_code.co_name.title().replace("_", " ").upper()
     print(f"\n🏃 {m}")
 
@@ -24,7 +27,7 @@ def run_process_request_pipeline(args: dict, dataset: dict) -> dict:
     requests_df = dataset.get("requests")
     total_requests = len(requests_df)
 
-    print(f"# --- Processing {total_requests} requests. --- #")
+    print(f"# --- Processing {total_requests} requests --- #")
 
     request_idx = _check_id(args)
 
@@ -41,7 +44,7 @@ def run_process_request_pipeline(args: dict, dataset: dict) -> dict:
             print(get_progress_bar(idx, total_requests))
             show_timer(start_time)
 
-    return output_rows
+    return output_rows, llm_model.usage
 
 
 def _check_id(args: dict) -> int | None:

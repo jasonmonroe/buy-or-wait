@@ -19,11 +19,13 @@ from src.constants import (
     RATE_LIMIT_RETRIES,
     SYS_INSTR_PROMPT,
 )
+from src.usage_tracker import UsageTracker
 
 
 class LlmModel:
     def __init__(self):
         self._client = self._load()
+        self.usage = UsageTracker()
 
     def _load(self):
         return OpenAI(
@@ -50,6 +52,13 @@ class LlmModel:
                     top_p=1.0,
                     timeout=90.0,
                 )
+
+                if getattr(response, "usage", None):
+                    self.usage.record(
+                        model=response.model or MODEL_NAME,
+                        input_tokens=response.usage.prompt_tokens or 0,
+                        output_tokens=response.usage.completion_tokens or 0,
+                    )
 
                 return self._filter_response(response)
 

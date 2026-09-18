@@ -1,10 +1,11 @@
 # .gitignore
-
+\
 .DS_Store
 .env
 .idea
 .venv
 .vscode
+AGENTS.md
+CLAUDE.md
 venv
-
 dataset/_output_orig.csv
