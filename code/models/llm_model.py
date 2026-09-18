@@ -22,9 +22,7 @@ from src.constants import (
 
 
 class LlmModel:
-    def __init__(
-        self,
-    ):
+    def __init__(self):
         self._client = self._load()
 
     def _load(self):
@@ -53,7 +51,7 @@ class LlmModel:
                     timeout=90.0,
                 )
 
-                return self._format_response(self._filter_response(response))
+                return self._filter_response(response)
 
             except InternalServerError as e:
                 print(f"🚨 Server error encountered (503/5xx): {e} 🚨")

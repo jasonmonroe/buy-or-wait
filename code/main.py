@@ -35,6 +35,15 @@ __version__ = "1.0.0"
 import inspect
 import sys
 import warnings
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load .env before any project import touches src.constants, since constants
+# reads MODEL_API_KEY/MODEL_NAME/MODEL_API_URL from the environment at import
+# time. Resolved relative to this file (repo root's .env), not the CWD, so it
+# works regardless of where `python code/main.py` is invoked from.
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from evaluation.main import run_evaluation_pipeline
 from pipelines.process_request import run_process_request_pipeline
@@ -56,7 +65,7 @@ def run_main_pipeline(args: dict):
     output = run_process_request_pipeline(args, data_handle.__dict__)
 
     # Save Outputs
-    # data_handle.save(output)
+    data_handle.save(output)
 
     # Evaluate
     if args.get("eval"):

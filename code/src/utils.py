@@ -73,3 +73,7 @@ def pretty_dict(d: dict, indent: int = 4, stage: str = "") -> str:
     )
 
     return pretty
+
+
+def format_date(date_str: str) -> str:
+    return str(date_str.strftime("%Y-%m-%d"))

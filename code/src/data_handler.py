@@ -13,6 +13,52 @@ import pandas as pd
 from src.constants import CSV_FILENAMES, DATASET_DIR, OUTPUT_FILE
 from src.utils import pretty_dict
 
+DATE_COLUMNS = {
+    "requests": ["request_date", "desired_completion_date"],
+    "sample_requests": ["request_date", "desired_completion_date"],
+    "financial_events": ["event_date", "settlement_date"],
+    "exchange_rates": ["rate_date"],
+    "request_payment_options": ["first_payment_date"],
+}
+
+NUMERIC_COLUMNS = {
+    "requests": ["requested_amount"],
+    "sample_requests": ["requested_amount", "amount_safe_to_pay"],
+    "financial_events": ["amount", "minimum_allowed_amount"],
+    "exchange_rates": ["rate"],
+    "request_payment_options": [
+        "payment_amount",
+        "number_of_payments",
+        "payment_frequency_days",
+        "financing_fee",
+        "total_payable_amount",
+    ],
+    "financial_profiles": [
+        "current_available_balance",
+        "minimum_balance_to_keep",
+        "max_installment_months",
+    ],
+}
+
+BOOL_COLUMNS = {
+    "requests": ["allows_partial_payment"],
+    "sample_requests": ["allows_partial_payment"],
+}
+
+DATETIME_COLUMNS = {
+    "messages": ["sent_at"],
+}
+
+LIST_COLUMNS = {
+    "financial_profiles": [
+        "financial_priorities",
+        "expense_categories_to_protect",
+        "expense_categories_user_is_willing_to_reduce",
+        "expense_categories_user_is_willing_to_stop",
+        "payment_methods_user_will_consider",
+    ],
+}
+
 
 class DataHandler:
     def __init__(self, args: dict):
@@ -44,7 +90,36 @@ class DataHandler:
     def _path(self, csv_file: str) -> pd.DataFrame:
         filepath = f"{DATASET_DIR}{csv_file}.csv"
         print(f"📁 Loading {filepath}")
-        return pd.read_csv(Path(filepath))
+        df = pd.read_csv(Path(filepath))
+        return self._coerce(df, csv_file)
+
+    def _coerce(self, df: pd.DataFrame, csv_file: str) -> pd.DataFrame:
+        """Parses dates/numbers/lists once at load time so downstream code
+        works with real `date`/`float`/`list` values instead of raw strings."""
+
+        for col in DATE_COLUMNS.get(csv_file, []):
+            if col in df.columns:
+                df[col] = pd.to_datetime(df[col], errors="coerce").dt.date
+
+        for col in DATETIME_COLUMNS.get(csv_file, []):
+            if col in df.columns:
+                df[col] = pd.to_datetime(df[col], errors="coerce")
+
+        for col in NUMERIC_COLUMNS.get(csv_file, []):
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+
+        for col in BOOL_COLUMNS.get(csv_file, []):
+            if col in df.columns:
+                df[col] = df[col].astype(bool)
+
+        for col in LIST_COLUMNS.get(csv_file, []):
+            if col in df.columns:
+                df[col] = df[col].apply(
+                    lambda v: v.split("|") if isinstance(v, str) and v else []
+                )
+
+        return df
 
     def load_image(self):
         pass

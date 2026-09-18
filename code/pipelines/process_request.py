@@ -4,7 +4,6 @@
 # +---------------------------------------------------------------------------+
 
 import inspect
-import sys
 
 from agents.request_agent import RequestAgent
 from models.llm_model import LlmModel
@@ -13,8 +12,6 @@ from models.llm_model import LlmModel
 def run_process_request_pipeline(args: dict, dataset: dict) -> dict:
     m = inspect.currentframe().f_code.co_name.title().replace("_", " ").upper()
     print(f"🏃 {m}")
-
-    # print(dataset)
 
     output_rows = []
     requests_df = dataset.get("requests")
@@ -35,7 +32,7 @@ def run_process_request_pipeline(args: dict, dataset: dict) -> dict:
             output_rows.append(output)
 
     print(f"output_rows={output_rows}")
-    sys.exit(0)
+
     return output_rows
 
 

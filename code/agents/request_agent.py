@@ -4,21 +4,21 @@
 # +---------------------------------------------------------------------------+
 
 # Python Libraries
-import sys
-from datetime import datetime
+import re
 from pathlib import Path
 
-import easyocr
-
-# from numpy.random import f
+# Vendor Libraries
 import pandas as pd
 import pytesseract
 from PIL import Image
-from src.constants import IMAGE_DIR
 
 # Local Libraries
-from src.enum import AffordabilityStatus, RecommendedPaymentMethod, RequestType
+from src import rules_engine
+from src.constants import IMAGE_DIR, MODEL_API_KEY
+from src.enum import AffordabilityStatus, RecommendedPaymentMethod
 from src.prompt_builder import PromptBuilder
+
+_AMOUNT_PATTERN = re.compile(r"[\d][\d,]*\.?\d*")
 
 
 class RequestAgent:
@@ -41,6 +41,7 @@ class RequestAgent:
         self.spending_changes_needed = None
         self.decision_explanation = None
 
+        self._ctx = None
         self._data = data.copy()
 
     def _set_attrs(self, df: pd.Series):
@@ -48,25 +49,17 @@ class RequestAgent:
             if hasattr(self, key):
                 setattr(self, key, value)
 
-    def process_by_id(self, df: dict):
-        # self.data = data
+    def process_by_id(self, df: pd.Series) -> dict:
         self._set_attrs(df)
-        print(self.__dict__)
 
-        # Update Filtered Data
         filtered_dataset = self.filter()
-        filtered_with_rules_dataset = self.apply_rules(filtered_dataset)
+        self.apply_rules(filtered_dataset)
+        self.get_decision_explanation()
 
-        sys.exit(0)
+        if not self.check_rules():
+            print(f"⚠️  check_rules() failed for {self.request_id}")
 
-        prompt_dataset = filtered_dataset | filtered_with_rules_dataset
-
-        self.check_rules()
-
-        # Now that you have all the prelimanary data build the final prompt.
-        builder = PromptBuilder(prompt_dataset)
-
-        return self.model.get_response(builder.prompt)
+        return self.get_output()
 
     def filter(self) -> dict:
         exchange_rates = self._data.get("exchange_rates")
@@ -83,23 +76,17 @@ class RequestAgent:
             request_payment_options["request_id"] == self.request_id
         ]
 
-        # Next, filter the rows by user_id
-        # exchange_rates = exchange_rates[exchange_rates["user_id"] == self.user_id]
+        # Next, filter the rows by user_id. `financial_events` keeps the
+        # user's FULL history (not just events a message happens to
+        # reference) - the 90-day forecast and recurrence detection need the
+        # whole picture. `related_event_id` is only used to attach message
+        # evidence to a specific event later, never to narrow the working
+        # event set.
         financial_events = financial_events[financial_events["user_id"] == self.user_id]
         financial_profiles = financial_profiles[
             financial_profiles["user_id"] == self.user_id
         ]
         messages = messages[messages["user_id"] == self.user_id]
-
-        if not messages.empty:
-            event_ids = messages["related_event_id"].dropna()
-            event_ids = event_ids[event_ids != ""].tolist()
-
-            if event_ids:
-                financial_events = financial_events[
-                    financial_events["event_id"].isin(event_ids)
-                ]
-                images = images[images["related_event_id"].isin(event_ids)]
 
         return {
             "exchange_rates": exchange_rates,
@@ -110,160 +97,166 @@ class RequestAgent:
             "request_payment_options": request_payment_options,
         }
 
-    def apply_rules(self, filtered_data: dict):
+    def apply_rules(self, filtered_data: dict) -> dict:
         """
-        Applies business logic to populate all required attributes with
-        accurate data from the filtered request and user profile before passing
-        them to the Prompt Builder.
+        Runs the deterministic rules engine (src/rules_engine.py) to compute
+        all financial-decision attributes from the filtered request and user
+        profile. The LLM is never asked to do this arithmetic - it only
+        phrases `decision_explanation` afterward, in get_decision_explanation().
         """
-
-        exchange_rates = filtered_data.get("exchange_rates")
-        financial_events = filtered_data.get("financial_events")
-        financial_profiles = filtered_data.get("financial_profiles")
-        images = filtered_data.get("images")
-        messages = filtered_data.get("messages")
-        request_payment_options = filtered_data.get("request_payment_options")
-
-        """
-        'request_id': 'request_01',
-        'user_id': 'user_01',
-        'request_date': '2024-03-03',
-        'request_type': 'purchase',
-        'requested_amount': np.float64(25256.0),
-        'desired_completion_date': '2024-03-20',
-        'allows_partial_payment': np.True_,
-        'request_text': "Would paying for the laptop today leave enough for my 
-            regular expenses? The laptop I'm looking at is ZAR 25,256.",
-        
-        ----
-
-        'amount_safe_to_pay': np.float64(25256.0),
-        'affordability_status': 'affordable_now',
-        'recommended_payment_method': 'full_payment',
-        'payment_plan': '2024-03-03:25256',
-        'earliest_date_for_full_payment': '2024-03-03',
-        'spending_changes_needed': 'none',
-        'decision_explanation': 'Pay ZAR 25,256 today. This leaves at least ZAR 
-            18,000 available over the next 90 days.'
-        """
-
-        # When a financial event has a blank amount use its event_id to find
-        # related event id in images, then extract that amount from that image.
-
-        financial_event_date = financial_events["event_date"]
-
-        financial_event_amount = self.get_amount(filtered_data)
-
-        to_currency = self.calc_currency(
-            financial_events["currency"], financial_event_date, exchange_rates
+        self._ctx = rules_engine.compute(
+            self, filtered_data, ocr_fn=self.get_amount_from_image
         )
 
-        # Rules for output columns
+        self.get_amount_safe_to_pay()
+        self.get_affordability_status()
+        self.get_recommended_payment_method()
+        self.get_payment_plan()
+        self.get_earliest_date_for_full_payment()
+        self.get_spending_changes_needed()
+
+        return {
+            "amount_safe_to_pay": self.amount_safe_to_pay,
+            "affordability_status": self.affordability_status,
+            "recommended_payment_method": self.recommended_payment_method,
+            "payment_plan": self.payment_plan,
+            "earliest_date_for_full_payment": self.earliest_date_for_full_payment,
+            "spending_changes_needed": self.spending_changes_needed,
+        }
 
     def get_amount_safe_to_pay(self) -> float:
-        # The maximum amount theuser can safely pay today.
-
-        self.amount_safe_to_pay = None
+        self.amount_safe_to_pay = self._ctx.amount_safe_to_pay
+        return self.amount_safe_to_pay
 
     def get_affordability_status(self) -> str:
-        """
-        Whether the reqeust is affordable now, affordable with a plan,
-        affordable later, or not affordable.
-        """
-        self.affordability_status = None
+        self.affordability_status = self._ctx.affordability_status
+        return self.affordability_status
 
     def get_recommended_payment_method(self) -> str:
-        """
-        The safest way to proceed.  Uses Enum value determined by logic.
-        """
-        self.recommended_payment_method = None
+        self.recommended_payment_method = self._ctx.recommended_payment_method
+        return self.recommended_payment_method
 
-    def get_payment_plan(self) -> datetime:
-
-        payment_plan = None
-
-        self.payment_plan = None
+    def get_payment_plan(self) -> str:
+        self.payment_plan = self._ctx.payment_plan
+        return self.payment_plan
 
     def get_earliest_date_for_full_payment(self) -> str:
-        """The earliest safe date for pyaing the full amount."""
-        self.earliest_date_for_full_payment = None
+        self.earliest_date_for_full_payment = self._ctx.earliest_date_for_full_payment
+        return self.earliest_date_for_full_payment
 
     def get_spending_changes_needed(self) -> str:
-        """Flexible expenses that must be stopped or reduced."""
-        self.spending_changes_needed = None
+        self.spending_changes_needed = self._ctx.spending_changes_needed
+        return self.spending_changes_needed
 
     def get_decision_explanation(self) -> str:
-        """A short explanation supporting the recommendation."""
-        self.decision_explanation = None
+        """The one place the LLM is used: phrasing a short explanation around
+        the already-computed numbers. Falls back to a Python template if no
+        model API key is configured, so the engine stays testable offline."""
+        if not MODEL_API_KEY:
+            self.decision_explanation = self._fallback_explanation()
+            return self.decision_explanation
 
-    def get_amount(self, data) -> float:
-        # Get Financial Event amount
+        builder = PromptBuilder(self._build_explanation_payload())
+        response = self.model.get_response(builder.prompt) or {}
+        explanation = (
+            response.get("decision_explanation") if isinstance(response, dict) else None
+        )
 
-        financial_events = data.get("financial_events")
-        amount = financial_events["amount"].item()
+        self.decision_explanation = explanation or self._fallback_explanation()
+        return self.decision_explanation
 
-        if not amount:
-            image_data = None
-            images = data.get("images")
+    def _build_explanation_payload(self) -> dict:
+        return {
+            "request_id": self.request_id,
+            "home_currency": self._ctx.home_currency,
+            "requested_amount": self.requested_amount,
+            "minimum_balance_to_keep": self._ctx.minimum_balance_to_keep,
+            "amount_safe_to_pay": self.amount_safe_to_pay,
+            "affordability_status": self.affordability_status,
+            "recommended_payment_method": self.recommended_payment_method,
+            "payment_plan": self.payment_plan,
+            "earliest_date_for_full_payment": self.earliest_date_for_full_payment,
+            "spending_changes_needed": self.spending_changes_needed,
+        }
 
-            if not images.empty:
-                image_text = self.extract_from_image(images)
+    def _fallback_explanation(self) -> str:
+        currency = self._ctx.home_currency
+        minimum = self._ctx.minimum_balance_to_keep
 
-            # Get amount
+        if self.recommended_payment_method == RecommendedPaymentMethod.NOT_RECOMMENDED:
+            return (
+                f"Do not proceed with this request. None of the available options "
+                f"keeps the {currency} {minimum:,.0f} minimum protected."
+            )
 
-        return amount
+        return (
+            f"{self.recommended_payment_method.replace('_', ' ').title()}: "
+            f"{self.payment_plan}. Keeps at least {currency} {minimum:,.0f} available."
+        )
 
-    def get_output() -> dict:
-
-        return {}
+    def get_output(self) -> dict:
+        return {
+            "request_id": self.request_id,
+            "amount_safe_to_pay": self.amount_safe_to_pay,
+            "affordability_status": self.affordability_status,
+            "recommended_payment_method": self.recommended_payment_method,
+            "payment_plan": self.payment_plan,
+            "earliest_date_for_full_payment": self.earliest_date_for_full_payment,
+            "spending_changes_needed": self.spending_changes_needed,
+            "decision_explanation": self.decision_explanation,
+        }
 
     def check_rules(self) -> bool:
         """Check rules of each attribute to see if the data is correct."""
+        skip_keys = {"_data", "_ctx", "earliest_date_for_full_payment"}
 
-        for key, value in self.__dict__:
-            if key == "_data":
+        for key, value in self.__dict__.items():
+            if key in skip_keys:
                 continue
-            if not value:
+            if value is None:
                 return False
+
+        if not (0 <= self.amount_safe_to_pay <= self.requested_amount):
+            return False
+
+        # For `affordable_now`, `earliest_date_for_full_payment` must equal
+        # `request_date`. Leave it empty when the full amount is not
+        # expected to become safe within the forecast period.
+        if (
+            self.affordability_status == AffordabilityStatus.AFFORDABLE_NOW
+            and self.earliest_date_for_full_payment != self.request_date.isoformat()
+        ):
+            return False
 
         return True
 
-    def is_of_request_type(self, request_type: str) -> bool:
-        return request_type in [item.value for item in RequestType]
+    def get_amount_from_image(self, images: pd.DataFrame) -> float | None:
+        """Used by rules_engine.resolve_events() to fill a blank financial-
+        event amount by OCR'ing its linked image (never treat blank as 0)."""
+        if images.empty:
+            return None
 
-    def is_of_affordability_status(self, status: str) -> bool:
-        return status in [item.value for item in AffordabilityStatus]
+        text = self.extract_from_image(images)
+        return self._parse_amount_from_text(text)
 
-    def is_of_recommended_payment_method(self, pay_method: str) -> bool:
-        return pay_method in [item.value for item in RecommendedPaymentMethod]
-
-    def calc_currency(
-        self, home_currency: str, event_date: str, exchange_rates
-    ) -> float:
-        rates = exchange_rates[
-            (exchange_rates["from_currency"] == home_currency)
-            & (exchange_rates["event_date"] == event_date)
-        ]
-
-        return rates["to_currency"].items()
-
-    def extract_from_image(self, images):
+    def extract_from_image(self, images: pd.DataFrame) -> str:
         image_id = images["image_id"].iloc[0]
-        image_path = Path(f"{IMAGE_DIR}{image_id}")
-        # Open and load the image
-        # img = Image.open(image_path)
+        image_path = Path(f"{IMAGE_DIR}{image_id}.png")
 
-        # Show image details
-        # print(img.format, img.size, img.mode)
+        if not image_path.exists():
+            return ""
 
-        # Display the image
-        # img.show()
+        return pytesseract.image_to_string(Image.open(image_path))
 
-        # i  # mg_path = Path("document.jpg")
+    def _parse_amount_from_text(self, text: str) -> float | None:
+        candidates = []
+        for match in _AMOUNT_PATTERN.finditer(text or ""):
+            raw = match.group().replace(",", "")
+            try:
+                value = float(raw)
+            except ValueError:
+                continue
+            if value > 0:
+                candidates.append(value)
 
-        # Extract text directly from the image
-        reader = easyocr.Reader(["en"])
-        results = reader.readtext(str(image_path))
-        text = pytesseract.image_to_string(Image.open(image_path))
-
-        return text
+        return max(candidates) if candidates else None
