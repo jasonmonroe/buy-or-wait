@@ -382,7 +382,10 @@ def estimate_variable_spending(ctx: FinancialContext) -> None:
 
     total_daily_rate = 0.0
     for category, group in history.groupby("category"):
-        if category in recurring_debit_categories or len(group) < MIN_VARIABLE_OCCURRENCES:
+        if (
+            category in recurring_debit_categories
+            or len(group) < MIN_VARIABLE_OCCURRENCES
+        ):
             continue
         total_daily_rate += group["amount_home_ccy"].sum() / VARIABLE_LOOKBACK_DAYS
 
